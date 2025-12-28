@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/s-maitland/gitflow-automator/internal/git"
+	"github.com/s-maitland/gitflow-automator/internal/ui"
 )
 
 func main(){
@@ -32,7 +33,7 @@ func main(){
 	case "help", "--help", "-h":
 		printUsage()
 	default:
-		fmt.Printf("Unknown command: %s\n, command")
+		fmt.Printf("Unknown command: %s\n", command)
 		printUsage()
 		os.Exit(1)
 	}
@@ -58,7 +59,7 @@ func printUsage() {
 
 func handleFeature(args []string) {
 	if len(args) == 0 {
-		fmt.Println("Error: Feature name is required")
+		ui.PrintRed("Error: Feature name is required")
 		fmt.Println("Usage: gwa feature <name>")
 		os.Exit(1)
 	}
@@ -68,18 +69,87 @@ func handleFeature(args []string) {
 	branchName = strings.ReplaceAll(branchName, " ", "-")
 	fullBranchName := "feature/" + branchName
 
-	fmt.Printf("Creating branch: %s\n", fullBranchName)
+	ui.PrintCyan("Creating branch: %s\n", fullBranchName)
 
 	if err := git.CreateBranch(fullBranchName); err != nil {
 		fmt.Println("Error: Failed to create branch")
 		os.Exit(1)
 	}
 
-	fmt.Printf("✓ Created and switched to branch: %s\n", fullBranchName)
+	ui.PrintGreen("✓ Created and switched to branch: %s\n", fullBranchName)
 }
 
 func handleCommit(args []string) {
-	fmt.Println("Running commit command...")
+	staged, err := git.GetStagedFiles()
+	if err != nil {
+		ui.PrintRed("Error: %v", err)
+		os.Exit(1)
+	}
+
+	if len(staged) == 0 {
+		ui.PrintYellow("⚠ No staged changes to commit")
+		fmt.Println("\nStage files first with: git add <file>")
+		os.Exit(0)
+	}
+
+	ui.PrintCyan("Staged files:")
+	for _, file := range staged {
+		fmt.Printf("  - %s\n", file)
+	}
+	fmt.Println()
+
+	commitTypes := []string{
+		"feat     - A new feature",
+		"fix      - A bug fix",
+		"docs     - Documentation changes",
+		"style    - Code style changes",
+		"refactor - Code refactoring",
+		"test     - Adding tests",
+		"chore    - Maintenance tasks",
+	}
+
+	_, selected, err := ui.PromptSelect("Select commit type: ", commitTypes)
+	if err != nil {
+		ui.PrintRed("Error: %v", err)
+		os.Exit(1)
+	}
+
+	commitType := strings.Fields(selected)[0]
+
+	scope, _ := ui.PromptString("Scope (optional, press Enter to skip)")
+
+	message, err := ui.PromptString("Commit message: ")
+	if err != nil || message == "" {
+		ui.PrintRed("Error: commit message required")
+		os.Exit(1)
+	}
+
+	var fullMessage strings.Builder
+	fullMessage.WriteString(commitType)
+
+	if scope != "" {
+		fullMessage.WriteString(fmt.Sprintf("(%s)", scope))
+	}
+
+	fullMessage.WriteString(": ")
+	fullMessage.WriteString(message)
+
+	fmt.Println()
+	ui.PrintCyan("Commit message preview:")
+	fmt.Println(fullMessage.String())
+	fmt.Println()
+
+	if !ui.PromptYesNo("Create commit?") {
+		ui.PrintYellow("✗ Commit cancelled")
+		os.Exit(0)
+	}
+
+	if err := git.Commit(fullMessage.String()); err != nil {
+		ui.PrintRed("Error creating commit: %v", err)
+		os.Exit(1)
+	}
+
+	ui.PrintGreen("✓ Commit created successfully!")
 }
 
 func handleStatus(args []string) {
@@ -95,14 +165,14 @@ func handleStatus(args []string) {
 		os.Exit(1)
 	}
 
-	fmt.Println("═══════════════════════════════════════")
-	fmt.Printf("📍 Current branch: %s\n", currentBranch)
-	fmt.Println("═══════════════════════════════════════")
+	fmt.Println(ui.Cyan("═══════════════════════════════════════"))
+	fmt.Printf("📍 Current branch: %s\n", ui.Green(currentBranch))
+	fmt.Println(ui.Cyan("═══════════════════════════════════════"))
 	fmt.Println("\n📝 Status:")
 	if status == "" {
-		fmt.Println("  ✓ Clean - no changes")
+		ui.PrintGreen("  ✓ Clean - no changes")
 	} else {
 		fmt.Println(status)
 	}
-	fmt.Println("═══════════════════════════════════════")
+	fmt.Println(ui.Cyan("═══════════════════════════════════════"))
 }
