@@ -1,0 +1,12 @@
+{
+  "branchPrefixes": {
+    "feature": "feature/",
+    "hotfix": "hotfix/",
+    "release": "release/"
+  },
+  "baseBranches": {
+    "feature": "develop",
+    "hotfix": "main",
+    "release": "develop"
+  }
+}

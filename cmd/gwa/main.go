@@ -7,6 +7,8 @@ import (
 
 	"github.com/s-maitland/gitflow-automator/internal/git"
 	"github.com/s-maitland/gitflow-automator/internal/ui"
+	"github.com/s-maitland/gitflow-automator/internal/cli"
+	"github.com/s-maitland/gitflow-automator/internal/config"
 )
 
 func main(){
@@ -58,16 +60,44 @@ func printUsage() {
 }
 
 func handleFeature(args []string) {
+	flags, args := cli.ParseFlags(args)
+
+	if flags.Help {
+		fmt.Println("Usage: gwa feature [options] <name>")
+		fmt.Println("\nOptions:")
+		fmt.Println("  -v, --verbose    Show detailed output")
+		fmt.Println("  -d, --dry-run    Show what would be done")
+		os.Exit(0)
+	}
+
 	if len(args) == 0 {
 		ui.PrintRed("Error: Feature name is required")
 		fmt.Println("Usage: gwa feature <name>")
 		os.Exit(1)
 	}
 
+	cfg, err := config.LoadConfig()
+	if err != nil {
+		ui.PrintRed("Error loading config: %v", err)
+		os.Exit(1)
+	}
+
 	branchName := strings.Join(args, "-")
 	branchName = strings.ToLower(branchName)
 	branchName = strings.ReplaceAll(branchName, " ", "-")
-	fullBranchName := "feature/" + branchName
+	fullBranchName := cfg.BranchPrefixes["feature"] + branchName
+
+	if flags.Verbose {
+		fmt.Println("Branch name formatting:")
+		fmt.Printf("  Input: %v\n", args)
+		fmt.Printf("  Output: %s\n", fullBranchName)
+		fmt.Println()
+	}
+
+	if flags.DryRun {
+		ui.PrintYellow("[DRY RUN] Would create branch: %s", fullBranchName)
+		return
+	}
 
 	ui.PrintCyan("Creating branch: %s\n", fullBranchName)
 
